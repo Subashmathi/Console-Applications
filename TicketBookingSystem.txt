@@ -1,0 +1,211 @@
+import java.util.*;
+
+class Passenger {
+    String name;
+    int age;
+    String berthPreference;
+    String alottedBerth;
+    String passengerId;
+    String gender;
+
+    Passenger(String name, int age, String prefer, String alotted, String gender, String id) {
+        this.name = name;
+        this.age = age;
+        this.berthPreference = prefer;
+        this.alottedBerth = alotted;
+        this.gender = gender;
+        this.passengerId = id;
+    }
+
+    @Override
+    public String toString() {
+        return String.format("%-15s %-4s %-17s %-18s %-15s %-10s %n",
+                name, age, berthPreference, alottedBerth, passengerId, gender);
+    }
+}
+
+class TicketSystem {
+
+    List<String> availableBerths = new ArrayList<>();
+    Queue<Passenger> racQueue = new LinkedList<>();
+    Queue<Passenger> waitingListQueue = new LinkedList<>();
+    List<Passenger> confirmedTickets = new ArrayList<>();
+    int counter = 1;
+
+    public void initializeBerths(int n) {
+        for (int i = 0; i < n / 3; i++) {
+            availableBerths.add("U");
+            availableBerths.add("M");
+            availableBerths.add("L");
+        }
+    }
+
+    public void displayBookedTickets() {
+        if (confirmedTickets.size() >= 1) {
+            System.out.printf("%-15s %-4s %-17s %-18s %-15s %-10s %n",
+                    "Name", "Age", "Berth Preference", "Alotted Berth", "Passenger ID", "Gender");
+
+            for (Passenger p : confirmedTickets) {
+                System.out.println(p);
+            }
+
+            for(Passenger p : racQueue){
+                System.out.println(p);
+            }
+
+            for(Passenger p : waitingListQueue){
+                System.out.println(p);
+            }
+
+        } else {
+            System.out.println("No confirmed Tickets");
+        }
+    }
+
+    public void displayAvailableTickets() {
+        System.out.println("Available Berths     : " + availableBerths.size());
+        System.out.println("RAC Queue Filled     : " + racQueue.size() + "/14");
+        System.out.println("Waiting List Filled  : " + waitingListQueue.size() + "/10");
+    }
+
+    public void bookTicket(String name, int age, String berthPreference, String gender) {
+
+        String passengerId = "T" + counter++;
+
+        if (!availableBerths.isEmpty()) {
+
+            String alottedBerth = allocateBerth(gender, berthPreference, age);
+
+            Passenger passenger = new Passenger(name, age, berthPreference, alottedBerth, gender, passengerId);
+
+            confirmedTickets.add(passenger);
+            availableBerths.remove(alottedBerth);
+
+            System.out.println("Booking Confirmed, Passenger ID: " + passengerId);
+        }
+        else if (racQueue.size() < 14) {
+
+            Passenger passenger = new Passenger(name, age, berthPreference, "RAC", gender, passengerId);
+            racQueue.offer(passenger);
+            System.out.println("Ticket booked in RAC, Passenger ID: " + passengerId);
+        }
+        else if (waitingListQueue.size() < 10) {
+
+            Passenger passenger = new Passenger(name, age, berthPreference, "Waiting List", gender, passengerId);
+            waitingListQueue.offer(passenger);
+            System.out.println("Ticket booked in Waiting List, Passenger ID: " + passengerId);
+        }
+        else {
+            System.out.println("No tickets available!");
+        }
+    }
+
+    public String allocateBerth(String gender, String berthPreference, int age) {
+
+        if (age >= 60 && availableBerths.contains("L"))
+            return "L";
+
+        if (gender.equalsIgnoreCase("Female") && availableBerths.contains("L"))
+            return "L";
+
+        if (availableBerths.contains(berthPreference))
+            return berthPreference;
+
+        return availableBerths.get(0);
+    }
+
+    public void cancelTicket(String ticketId) {
+
+        Passenger found = null;
+
+        for (Passenger p : confirmedTickets) {
+            if (p.passengerId.equals(ticketId)) {
+                found = p;
+                break;
+            }
+        }
+
+        if (found == null) {
+            System.out.println("No ticket available on this ID");
+            return;
+        }
+
+        availableBerths.add(found.alottedBerth);
+        confirmedTickets.remove(found);
+
+        if (!racQueue.isEmpty()) {
+            Passenger racPass = racQueue.poll();
+            String alottedBerth = allocateBerth(racPass.gender, racPass.berthPreference, racPass.age);
+
+            racPass.alottedBerth = alottedBerth;
+            confirmedTickets.add(racPass);
+            availableBerths.remove(alottedBerth);
+
+            System.out.println("RAC moved to Confirmed: " + racPass.passengerId);
+        }
+
+        if (!waitingListQueue.isEmpty()) {
+            Passenger wlPass = waitingListQueue.poll();
+            wlPass.alottedBerth = "RAC";
+            racQueue.offer(wlPass);
+
+            System.out.println("Waiting List moved to RAC: " + wlPass.passengerId);
+        }
+
+        System.out.println("Ticket cancelled successfully!");
+    }
+}
+
+class TicketBookingSystem {
+    public static void main(String[] args) {
+
+        Scanner scan = new Scanner(System.in);
+        TicketSystem ts = new TicketSystem();
+        ts.initializeBerths(3);
+
+        while (true) {
+            System.out.println("\n1.Book Ticket  2.Cancel Ticket  3.Available Tickets  4.Booked Tickets  5.Exit");
+            int input = scan.nextInt();
+
+            switch (input) {
+                case 1: {
+                    scan.nextLine();
+                    System.out.println("Enter passenger name: ");
+                    String name = scan.nextLine();
+                    System.out.println("Enter gender: ");
+                    String gender = scan.nextLine();
+
+                    System.out.println("Enter age: ");
+                    int age = scan.nextInt();
+                    scan.nextLine();
+
+                    System.out.println("Enter berth Preference (L/M/U): ");
+                    String preference = scan.nextLine();
+
+                    ts.bookTicket(name, age, preference, gender);
+                    break;
+                }
+                case 2: {
+                    scan.nextLine();
+                    System.out.println("Enter ticketId: ");
+                    String id = scan.nextLine();
+                    ts.cancelTicket(id);
+                    break;
+                }
+                case 3:
+                    ts.displayAvailableTickets();
+                    break;
+
+                case 4:
+                    ts.displayBookedTickets();
+                    break;
+
+                case 5:
+                    System.exit(0);
+
+                default:
+                    System.out.println("Invalid choice");
+            }
+        }
+    }
+}

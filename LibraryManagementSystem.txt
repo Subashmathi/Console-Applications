@@ -1,0 +1,394 @@
+import java.util.*;
+import java.time.LocalDate;
+
+class Book {
+    private String name;
+    private String author;
+    private int ISBN;
+    private int copies;
+    private int initialCopies;
+
+    Book(String name, String author, int isbn, int copies){
+        this.name = name;
+        this.author = author;
+        this.initialCopies = copies;
+        this.ISBN = isbn;
+        this.copies = copies;
+    }
+
+    public String getName(){ return name; }
+    public String getAuthor(){ return author; }
+    public int getISBN(){ return ISBN; }
+    public int getCopies(){ return copies; }
+    public void setCopies(int change){ this.copies += change; }
+    public int getInitialCopies(){ return initialCopies; }
+    public void setInitialCopies(int n){ initialCopies += n; }
+
+    @Override
+    public String toString(){
+        return String.format("%-25s %-27s %-5d %-15d %-8d%n", name, author, ISBN, initialCopies, copies);
+    }
+}
+
+
+class Member {
+    private String userId;
+    private String username;
+    private Subscription subscription;
+    private List<BorrowRecord> borrows;
+    private LocalDate subscribedDate;
+    private LocalDate renewalDate;
+
+    Member(String userId, String user, Subscription sub, LocalDate subscribe){
+        this.userId = userId;
+        this.username = user;
+        this.subscription = sub;
+        this.subscribedDate = subscribe;
+        this.borrows = new LinkedList<>();
+        this.renewalDate = subscribedDate.plusDays(sub.getBorrowDays());
+    }
+
+    public Subscription getSubscription(){ return this.subscription; }
+    public List<BorrowRecord> getBorrowRecords(){ return borrows; }
+    public LocalDate getRenewalDate(){return renewalDate;}
+    public void addBorrowRecord(BorrowRecord b){ borrows.add(b); }
+    
+    @Override
+    public String toString(){
+      return String.format("%-7s %-15s %-15s %-15d %-12s", userId, username, subscription.getName(), borrows.size(), subscribedDate);
+    }
+
+    public void renewSubscription(){
+      this.subscribedDate = LocalDate.now();
+      this.renewalDate = subscribedDate.plusDays(subscription.getBorrowDays());
+    }
+
+    public void setSubscription(Subscription s){
+      this.subscription = s;
+      this.subscribedDate = LocalDate.now();
+      this.renewalDate = subscribedDate.plusDays(subscription.getBorrowDays());
+    }
+}
+
+
+class Subscription {
+    private String name;
+    private int numberOfBooksCanBorrow;
+    private int borrowDays;
+
+    Subscription(String name, int borrow, int days){
+        this.name = name;
+        this.numberOfBooksCanBorrow = borrow;
+        this.borrowDays = days;
+    }
+
+    public String getName(){ return name; }
+    public int getBorrowDays(){ return borrowDays; }
+    public int getNumberOfBooksCanBorrow(){ return numberOfBooksCanBorrow; }
+}
+
+
+class BorrowRecord {
+    private Book book;
+    private LocalDate issuedDate;
+    private LocalDate returnDate;
+    private boolean isReturned;
+    private LocalDate dueDate;
+
+    BorrowRecord(Book b, Subscription s){
+        this.book = b;
+        this.issuedDate = LocalDate.now();
+        this.dueDate = issuedDate.plusDays(s.getBorrowDays());
+        this.isReturned = false;
+    }
+
+    public void returnBook(){ 
+        this.isReturned = true;
+        this.returnDate = LocalDate.now();
+    }
+
+    public boolean getReturnStatus(){ return isReturned; }
+    public LocalDate getDueDate(){ return dueDate; }
+    public Book getBook(){ return book; }
+}
+
+
+class LibrarySystem {
+    Map<String, Member> members;
+    Map<String, Book> books;
+
+    static final Subscription FREE = new Subscription("Free", 1, 7);
+    static final Subscription SILVER = new Subscription("Silver", 3, 14);
+    static final Subscription GOLD = new Subscription("Gold", 5, 30);
+
+    LibrarySystem(){
+        members = new LinkedHashMap<>();
+        books = new LinkedHashMap<>();
+    }
+
+    public String addMember(String name, Subscription s, LocalDate date){
+        String id = (char)('A' + new Random().nextInt(26)) + "" + (members.size() + 1);
+        members.put(id, new Member(id, name, s, date));
+        return id;
+    }
+
+    public void removeMember(String id){
+        if(members.containsKey(id)) members.remove(id);
+        else System.out.println("Member ID not found.");
+    }
+
+    public void addBook(String name, String author, int ISBN, int copies){
+        books.put(String.valueOf(ISBN), new Book(name, author, ISBN, copies));
+    }
+
+    public void removeBook(String isbn){
+        if(books.containsKey(isbn)) books.remove(isbn);
+        else System.out.println("Book ISBN not found.");
+    }
+
+    public void borrowBook(String userid, String isbn){
+        if(!members.containsKey(userid)){
+            System.out.println("Invalid Member ID.");
+            return;
+        }
+        if(!books.containsKey(isbn)){
+            System.out.println("Invalid ISBN.");
+            return;
+        }
+
+        Book book = books.get(isbn);
+        Member member = members.get(userid);
+        if(book.getCopies() <= 0){
+            System.out.println("No copies available.");
+            return;
+        }
+        if(member.getBorrowRecords().size() >= member.getSubscription().getNumberOfBooksCanBorrow()){
+            System.out.println("Borrow limit reached.");
+            return;
+        }
+
+        BorrowRecord r = new BorrowRecord(book, member.getSubscription());
+        member.addBorrowRecord(r);
+        book.setCopies(-1);
+        System.out.println("Book Borrowed Successfully!");
+    }
+
+    public void returnBook(String userid, String isbn, LocalDate date){
+        if(!members.containsKey(userid)){
+            System.out.println("Invalid Member ID.");
+            return;
+        }
+        if(!books.containsKey(isbn)){
+            System.out.println("Invalid ISBN.");
+            return;
+        }
+
+        Member member = members.get(userid);
+        Book book = books.get(isbn);
+        BorrowRecord activeRecord = null;
+
+        for(BorrowRecord r : member.getBorrowRecords()){
+            if(r.getBook().getISBN() == Integer.parseInt(isbn) && !r.getReturnStatus()){
+                activeRecord = r;
+                break;
+            }
+        }
+
+        if(activeRecord == null){
+            System.out.println("You have not borrowed this book.");
+            return;
+        }
+
+        activeRecord.returnBook();
+        book.setCopies(1);
+
+        if(date.isAfter(activeRecord.getDueDate()))
+            System.out.println("Late Return! Due: " + activeRecord.getDueDate());
+        else
+            System.out.println("Book returned on time.");
+
+        System.out.println("Returned: " + book.getName());
+    }
+
+    public void addCopies(String isbn, int n){
+        books.get(isbn).setCopies(n);
+    }
+
+    public void AddCopies(String isbn, int n){
+        Book b = books.get(isbn);
+        b.setInitialCopies(n);
+        b.setCopies(n);
+    }
+
+    public void userRenewal(String userid){
+        if(!members.containsKey(userid)){
+            System.out.println("User id not found.");
+            return;
+        }
+        Member m = members.get(userid);
+        m.renewSubscription();
+        System.out.println("Subscription renewed successfully");
+        System.out.println("Next renewal date: "+m.getRenewalDate());
+    }
+
+    public void changePlan(String userid, String plan){
+        if(!members.containsKey(userid)){
+            System.out.println("User id not found");
+            return;
+        }
+        Subscription newPlan = plan.equalsIgnoreCase("Free") ? FREE :
+                               plan.equalsIgnoreCase("Silver") ? SILVER :
+                               plan.equalsIgnoreCase("Gold") ? GOLD : null;
+
+        if(newPlan == null){
+            System.out.println("Invalid subscription name.");
+            return;
+        }
+        Member m = members.get(userid);
+        if(m.getSubscription().getName().equalsIgnoreCase(plan)){
+            System.out.println("You are already in this plan.");
+            return;
+        }
+
+        m.setSubscription(newPlan);
+        System.out.println("Your plan changed to " + plan.toUpperCase());
+    }
+
+    public void displayBooks(){
+        if(books.isEmpty()){
+            System.out.println("No books available.");
+            return;
+        }
+
+        System.out.printf("%-30s %-25s %-10s %-15s %-15s%n",
+            "Name", "Author", "ISBN", "Total Copies", "Available Copies");
+
+        for(Book b : books.values()){
+            System.out.printf("%-30s %-25s %-10d %-15d %-15d%n",
+                b.getName(), b.getAuthor(), b.getISBN(), b.getInitialCopies(), b.getCopies());
+        }
+    }
+}
+
+
+class LibraryManagementSystem{
+  static final Scanner scan = new Scanner(System.in);
+
+  public static void main(String[] args){
+
+    LibrarySystem ls = new LibrarySystem();
+
+    while(true){
+      System.out.println("\n1.Add Book  2.Remove Book  3.Add User  4.Remove User  5.Borrow Book  6.Return Book  7.User Renewal  8.Change Plan  9.Display Books  10.Exit  11.Add Copies");
+      System.out.print("Enter choice: ");
+      int input = scan.nextInt();
+      scan.nextLine();
+
+      switch(input){
+
+      case 1: {
+        System.out.print("Enter book name: ");
+        String name = scan.nextLine();
+        System.out.print("Enter author name: ");
+        String author = scan.nextLine();
+        System.out.print("Enter ISBN: ");
+        int isbn = scan.nextInt();
+        System.out.print("Enter copies: ");
+        int copies = scan.nextInt();
+        ls.addBook(name, author, isbn, copies);
+        System.out.println("Book added successfully.");
+        break;
+      }
+
+      case 2: {
+        System.out.print("Enter ISBN to remove: ");
+        ls.removeBook(scan.nextLine());
+        break;
+      }
+
+      case 3: {
+        System.out.print("Enter username: ");
+        String name = scan.nextLine();
+        System.out.println("\nSubscription Plans:");
+        System.out.printf("%-10s %-25s %-12s%n", "Name", "BorrowDays", "BooksAllowed");
+        System.out.printf("%-10s %-25s %-12s%n", LibrarySystem.FREE.getName(), LibrarySystem.FREE.getBorrowDays(),LibrarySystem.FREE.getNumberOfBooksCanBorrow());
+        System.out.printf("%-10s %-25s %-12s%n", LibrarySystem.SILVER.getName(), LibrarySystem.SILVER.getBorrowDays(),LibrarySystem.SILVER.getNumberOfBooksCanBorrow());
+        System.out.printf("%-10s %-25s %-12s%n", LibrarySystem.GOLD.getName(), LibrarySystem.GOLD.getBorrowDays(),LibrarySystem.GOLD.getNumberOfBooksCanBorrow());
+
+        System.out.print("Enter Plan Name: ");
+        String plan = scan.nextLine();
+        Subscription s = plan.equalsIgnoreCase("Free") ? LibrarySystem.FREE :
+                         plan.equalsIgnoreCase("Silver") ? LibrarySystem.SILVER :
+                         plan.equalsIgnoreCase("Gold") ? LibrarySystem.GOLD : null;
+
+        if(s == null){
+            System.out.println("Invalid plan.");
+            break;
+        }
+
+        System.out.print("Enter subscribed date (yyyy-MM-dd): ");
+        LocalDate date = LocalDate.parse(scan.nextLine());
+        System.out.println("User ID: " + ls.addMember(name, s, date));
+        break;
+      }
+
+      case 4: {
+        System.out.print("Enter Member ID to remove:");
+        ls.removeMember(scan.nextLine());
+        break;
+      }
+
+      case 5: {
+        System.out.print("Enter user ID: ");
+        String uid = scan.nextLine();
+        System.out.print("Enter ISBN: ");
+        String isbn = scan.nextLine();
+        ls.borrowBook(uid, isbn);
+        break;
+      }
+
+      case 6: {
+        System.out.print("Enter user ID: ");
+        String uid = scan.nextLine();
+        System.out.print("Enter ISBN: ");
+        String isbn = scan.nextLine();
+        System.out.print("Enter return date (yyyy-MM-dd): ");
+        LocalDate date = LocalDate.parse(scan.nextLine());
+        ls.returnBook(uid, isbn, date);
+        break;
+      }
+
+      case 7: {
+        System.out.print("Enter user ID: ");
+        ls.userRenewal(scan.nextLine());
+        break;
+      }
+
+      case 8: {
+        System.out.print("Enter user ID: ");
+        String uid = scan.nextLine();
+        System.out.print("Enter new plan: ");
+        String plan = scan.nextLine();
+        ls.changePlan(uid, plan);
+        break;
+      }
+
+      case 9:
+        ls.displayBooks();
+        break;
+
+      case 10:
+        System.exit(0);
+
+      case 11: {
+        System.out.print("Enter ISBN: ");
+        String isbn = scan.nextLine();
+        System.out.print("Enter number of copies to add: ");
+        int n = scan.nextInt();
+        ls.AddCopies(isbn, n);
+        break;
+      }
+      }
+    }
+  }
+}

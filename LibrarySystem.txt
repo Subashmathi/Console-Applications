@@ -1,0 +1,185 @@
+import java.util.*;
+import java.sql.*;
+
+class DBConnection {
+    static Connection connect() {
+        String url = "jdbc:mysql://localhost:3306/";
+        String user = "root";
+        String pass = "2002";
+        String dbname = "Library";
+        try {
+            Class.forName("com.mysql.cj.jdbc.Driver");
+            Connection con = DriverManager.getConnection(url, user, pass);
+            Statement st = con.createStatement();
+            st.executeUpdate("CREATE DATABASE IF NOT EXISTS " + dbname);
+            st.execute("USE " + dbname);
+            return con;
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+}
+
+class Book {
+    private int id;
+    private String name;
+    private String author;
+    Book(int id, String name, String author) {
+        this.id = id;
+        this.name = name;
+        this.author = author;
+    }
+
+    public int getId() { return id; }
+    public String getName() { return name; }
+    public String getAuthor() { return author; }
+}
+
+class Member {
+    private int id;
+    private String name;
+    Member(int id, String name) {
+        this.id = id;
+        this.name = name;
+    }
+
+    public int getMemberId() { return id; }
+    public String getName() { return name; }
+}
+
+class LibraryManagementSystem {
+
+    Connection con;
+
+    LibraryManagementSystem() {
+        con = DBConnection.connect();
+        createTables();
+    }
+
+    private void createTables() {
+        try {
+            Statement st = con.createStatement();
+            st.executeUpdate("CREATE TABLE IF NOT EXISTS BOOKS(" + "ID INT PRIMARY KEY, Name VARCHAR(50), Author VARCHAR(50))");
+            st.executeUpdate("CREATE TABLE IF NOT EXISTS MEMBERS(" + "ID INT PRIMARY KEY, Name VARCHAR(50))");
+            st.executeUpdate("CREATE TABLE IF NOT EXISTS BORROWED_BOOKS(" + "borrow_id INT PRIMARY KEY AUTO_INCREMENT," + "book_id INT, member_id INT," + "FOREIGN KEY(book_id) REFERENCES BOOKS(ID)," + "FOREIGN KEY(member_id) REFERENCES MEMBERS(ID))");
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void addBook(Book b) throws Exception {
+        PreparedStatement pst = con.prepareStatement("INSERT INTO BOOKS VALUES(?,?,?)");
+        pst.setInt(1, b.getId());
+        pst.setString(2, b.getName());
+        pst.setString(3, b.getAuthor());
+        pst.executeUpdate();
+    }
+
+    public void addMember(Member m) throws Exception {
+        PreparedStatement pst =
+            con.prepareStatement("INSERT INTO MEMBERS VALUES(?,?)");
+        pst.setInt(1, m.getMemberId());
+        pst.setString(2, m.getName());
+        pst.executeUpdate();
+    }
+
+    public Book getBook(int id) throws Exception {
+        PreparedStatement pst = con.prepareStatement("SELECT * FROM BOOKS WHERE ID=?");
+        pst.setInt(1, id);
+        ResultSet rs = pst.executeQuery();
+
+        if (rs.next()) {
+            return new Book(rs.getInt(1), rs.getString(2), rs.getString(3));
+        }
+        return null;
+    }
+
+    public Member getMember(int id) throws Exception {
+        PreparedStatement pst = con.prepareStatement("SELECT * FROM MEMBERS WHERE ID=?");
+        pst.setInt(1, id);
+        ResultSet rs = pst.executeQuery();
+
+        if (rs.next()) {
+            return new Member(rs.getInt(1), rs.getString(2));
+        }
+        return null;
+    }
+
+    public int borrowBook(Book b, Member m) throws Exception {
+        PreparedStatement pst = con.prepareStatement("INSERT INTO BORROWED_BOOKS(book_id, member_id) VALUES(?,?)",Statement.RETURN_GENERATED_KEYS);
+        pst.setInt(1, b.getId());
+        pst.setInt(2, m.getMemberId());
+        pst.executeUpdate();
+        ResultSet rs = pst.getGeneratedKeys();
+        if (rs.next()) return rs.getInt(1);
+        return -1;
+    }
+
+    public void returnBook(int borrowId) throws Exception {
+        PreparedStatement pst = con.prepareStatement("DELETE FROM BORROWED_BOOKS WHERE borrow_id=?");
+        pst.setInt(1, borrowId);
+        pst.executeUpdate();
+    }
+
+    public void displayBooks() throws Exception {
+        Statement st = con.createStatement();
+        ResultSet rs = st.executeQuery("SELECT * FROM BOOKS");
+
+        System.out.printf("%-5s %-25s %-20s%n", "ID", "Book Name", "Author");
+        while (rs.next()) {
+            System.out.printf("%-5d %-25s %-20s%n",
+                rs.getInt(1), rs.getString(2), rs.getString(3));
+        }
+    }
+
+    public void displayMembers() throws Exception {
+        Statement st = con.createStatement();
+        ResultSet rs = st.executeQuery("SELECT * FROM MEMBERS");
+        System.out.printf("%-5s %-20s%n", "ID", "Name");
+        while (rs.next()) {
+            System.out.printf("%-5d %-20s%n",
+                rs.getInt(1), rs.getString(2));
+        }
+    }
+
+    public void displayBorrowedBooks() throws Exception {
+        Statement st = con.createStatement();
+        ResultSet rs = st.executeQuery("SELECT * FROM BORROWED_BOOKS");
+
+        System.out.printf("%-10s %-10s %-10s%n", "BorrowID", "BookID", "MemberID");
+        while (rs.next()) {
+            System.out.printf("%-10d %-10d %-10d%n",
+                rs.getInt(1), rs.getInt(2), rs.getInt(3));
+        }
+    }
+}
+
+public class LibrarySystem {
+    public static void main(String[] args) throws Exception {
+
+        LibraryManagementSystem lms = new LibraryManagementSystem();
+
+        lms.addBook(new Book(1, "Harry Potter", "J K Rowling"));
+        lms.addBook(new Book(2, "Lord of Rings", "J R R Tolkien"));
+
+        lms.addMember(new Member(1, "Alice"));
+        lms.addMember(new Member(2, "Bob"));
+
+        lms.displayBooks();
+        lms.displayMembers();
+
+        Book b = lms.getBook(1);
+        Member m = lms.getMember(1);
+
+        int borrowId = lms.borrowBook(b, m);
+        System.out.println("Book borrowed. Borrow ID: " + borrowId);
+
+        lms.displayBorrowedBooks();
+
+        lms.returnBook(borrowId);
+        System.out.println("Book returned.");
+
+        lms.displayBorrowedBooks();
+    }
+}

@@ -1,0 +1,132 @@
+import java.util.*;
+
+class Taxi {
+    int taxiId;
+    char currentPosition = 'A';
+    int totalEarnings = 0;
+    List<Booking> bookings = new ArrayList<>();
+
+    Taxi(int id) { 
+        this.taxiId = id; 
+    }
+
+    public int calculateEarnings(char pickUp, char drop){
+        int distance = Math.abs(drop - pickUp) * 15;
+        return 100 + (distance * 10);
+    }
+
+    public boolean isAvailable(int pickupTime){
+        if(bookings.isEmpty()) return true;
+        return bookings.get(bookings.size()-1).dropTime <= pickupTime;
+    }
+
+    public void addBooking(Booking b){
+        bookings.add(b);
+        this.currentPosition = b.dropPoint;
+        totalEarnings += b.amount;
+    }
+}
+
+
+class Booking {
+    int bookingId, customerId, pickupTime, dropTime, amount;
+    char pickupPoint, dropPoint;
+
+    Booking(int bookingId, int customerId, int pickupTime, int dropTime, int amount, char from, char to){
+        this.bookingId = bookingId;
+        this.customerId = customerId;
+        this.pickupTime = pickupTime;
+        this.dropTime = dropTime;
+        this.amount = amount;
+        this.pickupPoint = from;
+        this.dropPoint = to;
+    }
+}
+
+
+class TaxiBooking {
+    List<Taxi> taxis = new ArrayList<>();
+    int bookingCounter = 1;
+    int customerCounter = 1;
+    static final Scanner scan = new Scanner(System.in);
+
+    public void initializeTaxi(int n){
+        for(int i=1;i<=n;i++){
+            taxis.add(new Taxi(i));
+        }
+    }
+
+    public void displayDetails(){
+        for(Taxi t : taxis){
+            System.out.println("\nTaxi-"+t.taxiId+"   Total Earning: Rs."+t.totalEarnings);
+            System.out.printf("%-10s %-10s %-5s %-5s %-12s %-9s %-6s%n","BID","CID","From","To","PickupTime","DropTime","Amount");
+            for (Booking b : t.bookings) {
+                System.out.printf("%-10d %-10d %-5c %-5c %-12d %-9d %-6d%n",
+                        b.bookingId, b.customerId, b.pickupPoint, b.dropPoint, b.pickupTime, b.dropTime, b.amount);
+            }
+        }
+    }
+
+    public void addBooking(){
+        int customerId = customerCounter++;
+
+        System.out.print("Enter Pickup Point: ");
+        char pickup = Character.toUpperCase(scan.next().charAt(0));
+
+        System.out.print("Enter Drop Point: ");
+        char drop = Character.toUpperCase(scan.next().charAt(0));
+
+        System.out.print("Enter Pickup Time: ");
+        int pickupTime = scan.nextInt();
+
+        Taxi selectedTaxi = null;
+        int minDistance = Integer.MAX_VALUE;
+
+        for(Taxi taxi : taxis){
+            if(taxi.isAvailable(pickupTime)){ 
+                int distance = Math.abs(taxi.currentPosition - pickup);
+
+                if(distance < minDistance ||
+                   (distance == minDistance && taxi.totalEarnings < selectedTaxi.totalEarnings)){
+
+                    selectedTaxi = taxi;
+                    minDistance = distance;
+                }
+            }
+        }
+
+        if(selectedTaxi == null){
+            System.out.println("No Taxi Available.");
+            return;
+        }
+
+        int amount = selectedTaxi.calculateEarnings(pickup, drop);
+        int dropTime = pickupTime + Math.abs(drop - pickup);
+
+        Booking booking = new Booking(bookingCounter++, customerId, pickupTime, dropTime, amount, pickup, drop);
+        selectedTaxi.addBooking(booking);
+
+        System.out.println("Taxi-" + selectedTaxi.taxiId + " allotted");
+    }
+}
+
+
+public class TaxiBookingSystem {
+    public static void main(String[] args){
+        TaxiBooking tb = new TaxiBooking();
+        System.out.print("Enter number of taxis: ");
+        int numtaxis = TaxiBooking.scan.nextInt();
+        tb.initializeTaxi(numtaxis);
+
+        while(true){
+            System.out.println("\n1.Book Taxi  2.Display Taxi Details  3.Exit");
+            int input = TaxiBooking.scan.nextInt();
+            switch(input){
+                case 1 -> tb.addBooking();
+                case 2 -> tb.displayDetails();
+                case 3 -> System.exit(0);
+                default -> System.out.println("Invalid Choice");
+            }
+        }
+    }
+}

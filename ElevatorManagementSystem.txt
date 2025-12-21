@@ -1,0 +1,126 @@
+import java.util.*;
+
+class Elevator{
+  private String name;
+  private int currentFloor;
+  private char currentPosition;
+  private int lifetime;
+  private int originalLifeTime;
+  
+  Elevator(int c, String n, int l){
+    currentFloor = c;
+    name = n;
+    lifetime = l;
+    originalLifeTime = l;
+  }
+  
+  public int getCurrentFloor(){return currentFloor;}
+  public void setCurrentFloor(int f){this.currentFloor = f;}
+  public char getCurrentPosition(){return currentPosition;}
+  public void setCurrentPosition(char p){this.currentPosition = p;}
+  public String getName(){return name;}
+  public void setLifeTime(){lifetime -= 1;}
+  public int getLifeTime(){return lifetime;}
+  public void setOriginalLifeTime(){lifetime = originalLifeTime;}
+  
+  @Override
+  public String toString(){
+    return String.format("%-7s %-10s %-15d",(name+"("+currentPosition+")"),currentFloor,lifetime);
+  }
+}
+
+
+class ElevatorSystem{
+
+  Random rand = new Random();
+
+  List<Elevator> elevators = new ArrayList<>();
+  List<Elevator> nearestElevators = new ArrayList<>();
+
+  public void initializeElevators(int n, int m, int l){
+    elevators.add(new Elevator(n,"L"+String.valueOf(m), l));
+  }
+
+  public void assignElevator(int start, int destination){
+
+    Elevator selectedElevator = null;
+    int minDistance = Integer.MAX_VALUE;
+    for(Elevator e : elevators){
+      int min = Math.abs(e.getCurrentFloor() - start);
+      if(min < minDistance){
+        minDistance = min;
+        nearestElevators.clear();
+        nearestElevators.add(e);
+      }else if(min == minDistance){
+         nearestElevators.add(e);
+      }
+    }
+    if(nearestElevators.size() == 1) selectedElevator = nearestElevators.get(0);
+    else{
+        nearestElevators.removeIf( e -> {return !((e.getCurrentPosition() == '+' && start >= destination) || (e.getCurrentPosition() == '-' && start <= destination) || e.getCurrentPosition() == '\u0000');
+        });
+    }
+    if(nearestElevators.size() == 1) selectedElevator = nearestElevators.get(0);
+    else{
+        nearestElevators.removeIf( e ->{
+        String name = e.getName();
+        return !(((name.charAt(name.length()-1) - '0') % 2 == 0 && start % 2 ==0) || ((name.charAt(name.length()-1) - '0') % 2 != 0 && start % 2 !=0));
+        });
+    }if(nearestElevators.size() == 1) selectedElevator = nearestElevators.get(0);
+     else{
+      selectedElevator = nearestElevators.get(rand.nextInt(nearestElevators.size()));
+    }
+    if(selectedElevator != null){
+      selectedElevator.setCurrentFloor(destination);
+      selectedElevator.setLifeTime();
+      if(start > destination) selectedElevator.setCurrentPosition('-');
+      else selectedElevator.setCurrentPosition('+');
+      System.out.println(selectedElevator.getName()+"-allotted");
+      System.out.printf("%-7s %-8s %-15s%n","Name", "Floor", "Lifetime");
+      for(Elevator e : elevators){
+        System.out.println(e);
+      }
+    }else{
+      System.out.println("No Elevators Available!");
+      return;
+    }
+    if(selectedElevator.getLifeTime() == 0){
+      selectedElevator.setOriginalLifeTime();
+    }
+  }
+}
+
+
+class ElevatorManagementSystem{
+  public static void main(String[] args){
+    Scanner scan = new Scanner(System.in);
+    ElevatorSystem es = new ElevatorSystem();
+    System.out.println("Enter number of lifts: ");
+    int a = scan.nextInt();
+    System.out.println("Enter the lifetime of the lifts: ");
+    int life = scan.nextInt();
+    for(int i=0;i<a;i++){
+      System.out.printf("Enter the present position of lift %d: ",i+1);
+      es.initializeElevators(scan.nextInt(), i+1, life);
+    }
+    while(true){
+      System.out.println("1.Take Life  2.Exit");
+      int input = scan.nextInt();
+      switch(input){
+        case 1:{
+          System.out.println("Enter your floor: ");
+          int start = scan.nextInt();
+          System.out.println("Enter destination floor: ");
+          int dest = scan.nextInt();
+          if(dest <= 100 && dest >= 0)
+            es.assignElevator(start, dest);
+          else
+            System.out.println("Invalid floor");
+          break;
+        }
+        case 2: System.exit(0);
+        default: {System.out.println("Invalid input"); break;}
+      }
+    }
+  }
+}

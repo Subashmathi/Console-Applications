@@ -1,0 +1,367 @@
+import java.util.*;
+import java.math.BigDecimal;
+import java.time.*;
+
+enum Type {
+    BIKE,
+    CAR,
+    TRUCK
+}
+
+interface Vehicle {
+    String getLicensePlate();
+    Type getType();
+}
+
+class Car implements Vehicle {
+    private String license;
+
+    Car(String license) {
+        this.license = license;
+    }
+
+    @Override
+    public String getLicensePlate() {
+        return license;
+    }
+
+    @Override
+    public Type getType() {
+        return Type.CAR;
+    }
+}
+
+class Bike implements Vehicle {
+    private String license;
+
+    Bike(String license) {
+        this.license = license;
+    }
+
+    @Override
+    public String getLicensePlate() {
+        return license;
+    }
+
+    @Override
+    public Type getType() {
+        return Type.BIKE;
+    }
+}
+
+class Truck implements Vehicle {
+    private String license;
+
+    Truck(String license) {
+        this.license = license;
+    }
+
+    @Override
+    public String getLicensePlate() {
+        return license;
+    }
+
+    @Override
+    public Type getType() {
+        return Type.TRUCK;
+    }
+}
+
+interface ParkingSpot {
+    boolean isAvailable();
+    void occupy(Vehicle vehicle);
+    void vacate();
+    int getSpotNumber();
+    Type getSize();
+}
+
+class CompactSpot implements ParkingSpot {
+    private final int spotNumber;
+    private Vehicle vehicle;
+
+    CompactSpot(int spotNumber) {
+        this.spotNumber = spotNumber;
+    }
+
+    @Override
+    public boolean isAvailable() {
+        return vehicle == null;
+    }
+
+    @Override
+    public void occupy(Vehicle vehicle) {
+        if (isAvailable()) this.vehicle = vehicle;
+    }
+
+    @Override
+    public void vacate() {
+        this.vehicle = null;
+    }
+
+    @Override
+    public int getSpotNumber() {
+        return spotNumber;
+    }
+
+    @Override
+    public Type getSize() {
+        return Type.BIKE;
+    }
+}
+
+class RegularSpot implements ParkingSpot {
+    private final int spotNumber;
+    private Vehicle vehicle;
+
+    RegularSpot(int spotNumber) {
+        this.spotNumber = spotNumber;
+    }
+
+    @Override
+    public boolean isAvailable() {
+        return vehicle == null;
+    }
+
+    @Override
+    public void occupy(Vehicle vehicle) {
+        if (isAvailable()) this.vehicle = vehicle;
+    }
+
+    @Override
+    public void vacate() {
+        this.vehicle = null;
+    }
+
+    @Override
+    public int getSpotNumber() {
+        return spotNumber;
+    }
+
+    @Override
+    public Type getSize() {
+        return Type.CAR;
+    }
+}
+
+class OversizedSpot implements ParkingSpot {
+    private final int spotNumber;
+    private Vehicle vehicle;
+
+    OversizedSpot(int spotNumber) {
+        this.spotNumber = spotNumber;
+    }
+
+    @Override
+    public boolean isAvailable() {
+        return vehicle == null;
+    }
+
+    @Override
+    public void occupy(Vehicle vehicle) {
+        if (isAvailable()) this.vehicle = vehicle;
+    }
+
+    @Override
+    public void vacate() {
+        this.vehicle = null;
+    }
+
+    @Override
+    public int getSpotNumber() {
+        return spotNumber;
+    }
+
+    @Override
+    public Type getSize() {
+        return Type.TRUCK;
+    }
+}
+
+class Ticket {
+    private final String ticketId;
+    private final Vehicle vehicle;
+    private final ParkingSpot spot;
+    private final LocalDateTime entryTime;
+    private LocalDateTime exitTime;
+
+    Ticket(String id, Vehicle v, ParkingSpot p, LocalDateTime entry) {
+        this.ticketId = id;
+        this.vehicle = v;
+        this.spot = p;
+        this.entryTime = entry;
+    }
+
+    public BigDecimal calculateParkingDuration() {
+        LocalDateTime end = exitTime == null ? LocalDateTime.now() : exitTime;
+        long seconds = Duration.between(entryTime, end).getSeconds();
+        return BigDecimal.valueOf(seconds);
+    }
+
+    public String getTicketId() { return ticketId; }
+    public Vehicle getVehicle() { return vehicle; }
+    public ParkingSpot getParkingSpot() { return spot; }
+    public LocalDateTime getEntryTime() { return entryTime; }
+    public LocalDateTime getExitTime() { return exitTime; }
+    public void setExitTime(LocalDateTime time) { this.exitTime = time; }
+}
+
+class Fare {
+    private static final BigDecimal BIKE_RATE = new BigDecimal("1.0");
+    private static final BigDecimal CAR_RATE = new BigDecimal("2.0");
+    private static final BigDecimal TRUCK_RATE = new BigDecimal("3.0");
+
+    public BigDecimal calculateFare(Ticket ticket) {
+        BigDecimal rate;
+        switch (ticket.getVehicle().getType()) {
+            case CAR: rate = CAR_RATE; break;
+            case TRUCK: rate = TRUCK_RATE; break;
+            default: rate = BIKE_RATE;
+        }
+        return rate.multiply(ticket.calculateParkingDuration());
+    }
+}
+
+class ParkingManager {
+    private Map<Type, List<ParkingSpot>> availableSpots = new HashMap<>();
+    private Map<Vehicle, ParkingSpot> vehicleToSpot = new HashMap<>();
+
+    ParkingManager(Map<Type, List<ParkingSpot>> spots) {
+        this.availableSpots = spots;
+    }
+
+    public ParkingSpot findSpot(Vehicle v) {
+        Type t = v.getType();
+        for (Type type : Type.values()) {
+            if (type.ordinal() >= t.ordinal()) {
+                for (ParkingSpot s : availableSpots.get(type)) {
+                    if (s.isAvailable()) return s;
+                }
+            }
+        }
+        return null;
+    }
+
+    public ParkingSpot park(Vehicle v) {
+        ParkingSpot spot = findSpot(v);
+        if (spot == null) return null;
+        spot.occupy(v);
+        vehicleToSpot.put(v, spot);
+        availableSpots.get(spot.getSize()).remove(spot);
+        return spot;
+    }
+
+    public void unpark(Vehicle v) {
+        ParkingSpot spot = vehicleToSpot.remove(v);
+        if (spot != null) {
+            spot.vacate();
+            availableSpots.get(spot.getSize()).add(spot);
+        }
+    }
+}
+
+class ParkingLot {
+    private ParkingManager manager;
+    private Fare fare;
+
+    ParkingLot(ParkingManager manager, Fare fare) {
+        this.manager = manager;
+        this.fare = fare;
+    }
+
+    public Ticket enter(Vehicle v) {
+        ParkingSpot spot = manager.park(v);
+        if (spot == null) return null;
+        return new Ticket(UUID.randomUUID().toString(), v, spot, LocalDateTime.now());
+    }
+
+    public BigDecimal exit(Ticket t) {
+        t.setExitTime(LocalDateTime.now());
+        manager.unpark(t.getVehicle());
+        return fare.calculateFare(t);
+    }
+}
+
+public class ParkingSystem {
+    public static void main(String[] args) {
+
+        Scanner scan = new Scanner(System.in);
+
+        Map<Type, List<ParkingSpot>> spots = new HashMap<>();
+        spots.put(Type.BIKE, new ArrayList<>());
+        spots.put(Type.CAR, new ArrayList<>());
+        spots.put(Type.TRUCK, new ArrayList<>());
+
+        spots.get(Type.BIKE).add(new CompactSpot(1));
+        spots.get(Type.CAR).add(new RegularSpot(2));
+        spots.get(Type.TRUCK).add(new OversizedSpot(3));
+
+        ParkingManager pm = new ParkingManager(spots);
+        Fare fare = new Fare();
+        ParkingLot lot = new ParkingLot(pm, fare);
+
+        Map<String, Ticket> ticketMap = new HashMap<>();
+
+        while (true) {
+
+            System.out.println("\n===== Parking System =====");
+            System.out.println("1. Park vehicle");
+            System.out.println("2. Unpark vehicle");
+            System.out.println("3. Exit");
+            System.out.print("Enter choice: ");
+
+            int choice = scan.nextInt();
+            scan.nextLine();
+
+            switch (choice) {
+
+                case 1:
+                    System.out.print("Enter vehicle type (BIKE/CAR/TRUCK): ");
+                    String type = scan.nextLine();
+
+                    System.out.print("Enter license number: ");
+                    String lic = scan.nextLine();
+
+                    Vehicle v;
+                    if (type.equalsIgnoreCase("BIKE")) v = new Bike(lic);
+                    else if (type.equalsIgnoreCase("CAR")) v = new Car(lic);
+                    else if (type.equalsIgnoreCase("TRUCK")) v = new Truck(lic);
+                    else {
+                        System.out.println("Invalid type");
+                        break;
+                    }
+
+                    Ticket t = lot.enter(v);
+
+                    if (t == null) {
+                        System.out.println("No parking spot available!");
+                    } else {
+                        ticketMap.put(t.getTicketId(), t);
+                        System.out.println("Vehicle parked. Ticket ID: " + t.getTicketId());
+                    }
+                    break;
+
+                case 2:
+                    System.out.print("Enter Ticket ID: ");
+                    String id = scan.nextLine();
+
+                    Ticket exiting = ticketMap.get(id);
+
+                    if (exiting == null) {
+                        System.out.println("Invalid Ticket ID!");
+                    } else {
+                        BigDecimal amount = lot.exit(exiting);
+                        System.out.println("Vehicle exited. Pay: Rs." + amount);
+                        ticketMap.remove(id);
+                    }
+                    break;
+
+                case 3:
+                    return;
+
+                default:
+                    System.out.println("Invalid choice");
+            }
+        }
+    }
+}
+
